@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 	"runtime/trace"
+	"strings"
 	"text/tabwriter"
 
-	"github.com/uudashr/gopkgs"
+	"github.com/ikgo/gopkgs"
 )
 
 var usageInfo = `
@@ -106,10 +108,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	pkgs, err := gopkgs.Packages(gopkgs.Options{
+	opts := gopkgs.Options{
 		WorkDir:  *flagWorkDir,
 		NoVendor: *flagNoVendor,
-	})
+	}
+	var pkgs map[string]gopkgs.Pkg
+	// check go.mod existence
+	
+	if findGoMod(opts.WorkDir) {
+		fmt.Println("go.mod exists. use go list command", opts.WorkDir)
+		pkgs, err = gopkgs.Packages111(opts)
+	} else {
+		fmt.Println("go.mod not exists. use original implementation", opts.WorkDir)
+		pkgs, err = gopkgs.Packages(opts)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -130,4 +142,17 @@ func main() {
 		}
 		fmt.Fprintln(w)
 	}
+}
+
+const GO_MOD = "go.mod"
+
+func findGoMod(path string) bool {
+	parts := strings.Split(path, "/")
+	for i := len(parts); i > 0; i-- {
+		p := parts[0:i]
+		if _, err := os.Stat(filepath.Join(strings.Join(p, "/"), GO_MOD)); err == nil {
+			return true
+		}
+	}
+	return false
 }
